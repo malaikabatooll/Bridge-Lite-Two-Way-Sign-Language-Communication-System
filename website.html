@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bridge Lite — AI Sign Language Communication</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Sora:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A1218;
+    --bg-panel:#101B22;
+    --bg-panel-2:#16232B;
+    --signal:#29E5C6;
+    --signal-dim:rgba(41,229,198,0.35);
+    --warm:#FF6B4A;
+    --warm-dim:rgba(255,107,74,0.3);
+    --text:#F2F5F4;
+    --text-muted:#7C8B92;
+    --border:rgba(255,255,255,0.08);
+    --font-display:'Space Grotesk',sans-serif;
+    --font-body:'Sora',sans-serif;
+    --font-mono:'JetBrains Mono',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{background:var(--bg);color:var(--text);font-family:var(--font-body);overflow-x:hidden;cursor:none;}
+  @media (pointer:coarse){body{cursor:auto;}}
+  a{color:inherit;}
+  ::selection{background:var(--signal-dim);color:var(--text);}
+  :focus-visible{outline:2px solid var(--signal);outline-offset:4px;}
+
+  #cursor-canvas{position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:9999;}
+  @media (pointer:coarse){#cursor-canvas{display:none;}}
+
+  nav{
+    position:fixed;top:0;left:0;right:0;z-index:100;
+    display:flex;justify-content:space-between;align-items:center;
+    padding:22px 6vw;
+    background:linear-gradient(to bottom, rgba(10,18,24,0.92) 0%, rgba(10,18,24,0.75) 60%, rgba(10,18,24,0) 100%);
+    backdrop-filter:blur(6px);
+  }
+  .nav-logo{font-family:var(--font-display);font-weight:700;font-size:1.05rem;letter-spacing:0.02em;display:flex;align-items:center;gap:8px;}
+  .nav-logo .dot{width:8px;height:8px;border-radius:50%;background:var(--signal);box-shadow:0 0 12px var(--signal);}
+  .nav-cta{font-family:var(--font-mono);font-size:0.7rem;letter-spacing:0.08em;color:var(--text-muted);text-decoration:none;text-transform:uppercase;border:1px solid var(--border);padding:9px 18px;border-radius:999px;transition:border-color .3s, color .3s;}
+  .nav-cta:hover{border-color:var(--signal);color:var(--signal);}
+
+  section{position:relative;padding:0 6vw;}
+
+  #hero{min-height:100vh;display:flex;flex-direction:column;justify-content:flex-start;padding-top:170px;padding-bottom:60px;position:relative;overflow:hidden;}
+  #hero-skeleton{position:absolute;right:-8vw;top:52%;transform:translateY(-50%);width:min(46vw,540px);opacity:0.16;pointer-events:none;}
+  .eyebrow{font-family:var(--font-mono);font-size:0.72rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--signal);margin-bottom:22px;display:flex;align-items:center;gap:10px;}
+  .eyebrow::before{content:'';width:22px;height:1px;background:var(--signal);}
+
+  h1.title{font-family:var(--font-display);font-weight:700;font-size:clamp(2.6rem,8vw,6.4rem);line-height:1.02;letter-spacing:-0.02em;max-width:14ch;}
+  .word-mask{display:inline-block;overflow:hidden;vertical-align:top;}
+  .word-inner{display:inline-block;transform:translateY(112%);}
+  .accent-mask .word-inner{color:var(--signal);}
+
+  .hero-sub{font-family:var(--font-body);font-weight:300;color:var(--text-muted);font-size:clamp(1rem,1.6vw,1.3rem);max-width:34ch;margin-top:26px;line-height:1.5;opacity:0;}
+  .scroll-cue{margin-top:52px;display:flex;align-items:center;gap:12px;font-family:var(--font-mono);font-size:0.72rem;letter-spacing:0.1em;color:var(--text-muted);text-transform:uppercase;text-decoration:none;width:fit-content;opacity:0;}
+  .scroll-cue .line{width:36px;height:1px;background:var(--text-muted);position:relative;overflow:hidden;}
+  .scroll-cue .line::after{content:'';position:absolute;inset:0;background:var(--signal);transform:translateX(-100%);animation:cue 1.8s ease-in-out infinite;}
+  @keyframes cue{ to{transform:translateX(100%);} }
+
+  .bento{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:60px;max-width:900px;}
+  .bento-card{background:var(--bg-panel);border:1px solid var(--border);border-radius:16px;padding:22px 20px;opacity:0;transform:translateY(24px);transition:border-color .3s, transform .3s;}
+  .bento-card:hover{border-color:var(--signal-dim);transform:translateY(-3px);}
+  .bento-card .num{font-family:var(--font-display);font-weight:700;font-size:2rem;color:var(--signal);}
+  .bento-card .label{font-family:var(--font-mono);font-size:0.65rem;letter-spacing:0.06em;color:var(--text-muted);text-transform:uppercase;margin-top:6px;display:block;}
+  .bento-card:nth-child(4){grid-column:span 2;}
+  .bento-card:nth-child(4) .num{color:var(--warm);font-size:1.3rem;}
+  @media (max-width:800px){.bento{grid-template-columns:repeat(2,1fr);} .bento-card:nth-child(4){grid-column:span 2;}}
+
+  .marquee-wrap{overflow:hidden;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:16px 0;margin-top:56px;}
+  .marquee-track{display:flex;gap:16px;white-space:nowrap;width:max-content;animation:marquee 24s linear infinite;font-family:var(--font-mono);font-size:0.78rem;letter-spacing:0.08em;color:var(--text-muted);}
+  .marquee-track .dot{color:var(--signal);}
+  @keyframes marquee{ from{transform:translateX(0);} to{transform:translateX(-50%);} }
+
+  #about{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding-top:120px;padding-bottom:120px;}
+  .section-head{max-width:640px;margin-bottom:70px;}
+  .section-head h2{font-family:var(--font-display);font-weight:600;font-size:clamp(2rem,4vw,3rem);letter-spacing:-0.01em;margin-top:14px;}
+  .section-head h2 .word-mask{overflow:hidden;display:inline-block;}
+  .section-head h2 .word-inner{display:inline-block;transform:translateY(112%);}
+  .section-head p{color:var(--text-muted);font-weight:300;font-size:1.05rem;line-height:1.65;margin-top:20px;max-width:56ch;}
+
+  .pipeline{display:flex;gap:0;align-items:stretch;max-width:1100px;flex-wrap:wrap;}
+  .pipe-step{flex:1;min-width:200px;padding:28px 24px;border-top:1px solid var(--border);position:relative;opacity:0;transform:translateX(-16px);transition:transform .3s;}
+  .pipe-step:hover{transform:translateX(0) translateY(-2px);}
+  .pipe-step .n{font-family:var(--font-mono);font-size:0.7rem;color:var(--signal);letter-spacing:0.08em;}
+  .pipe-step h3{font-family:var(--font-display);font-size:1.15rem;font-weight:600;margin-top:12px;}
+  .pipe-step p{color:var(--text-muted);font-size:0.9rem;line-height:1.5;margin-top:10px;}
+  .pipe-line{position:absolute;top:-1px;left:0;height:1px;width:0%;background:var(--signal);box-shadow:0 0 8px var(--signal);}
+
+  .about-note{margin-top:60px;padding:24px 28px;border-left:2px solid var(--warm);background:linear-gradient(90deg,var(--warm-dim),transparent);max-width:640px;font-size:0.98rem;color:var(--text);font-weight:300;line-height:1.6;opacity:0;transform:translateY(16px);}
+
+  #select{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding-top:100px;padding-bottom:100px;}
+  .mode-grid{display:flex;gap:22px;max-width:1100px;flex-wrap:wrap;}
+  .mode-card{flex:1;min-width:320px;background:var(--bg-panel);border:1px solid var(--border);border-radius:22px;padding:40px 36px;position:relative;overflow:hidden;transition:border-color .35s, background .35s;will-change:transform;cursor:pointer;}
+  .mode-card:hover{border-color:var(--signal-dim);background:var(--bg-panel-2);}
+  .mode-card .dir{font-family:var(--font-mono);font-size:0.68rem;letter-spacing:0.1em;color:var(--signal);text-transform:uppercase;}
+  .mode-card h3{font-family:var(--font-display);font-weight:600;font-size:1.7rem;margin-top:16px;letter-spacing:-0.01em;position:relative;display:inline-block;}
+  .mode-card h3::after{content:'';position:absolute;left:0;bottom:-4px;width:0;height:2px;background:var(--signal);transition:width .35s ease;}
+  .mode-card:hover h3::after{width:100%;}
+  .mode-card p{color:var(--text-muted);font-size:0.95rem;margin-top:14px;line-height:1.55;max-width:32ch;}
+  .mode-art{width:100%;height:140px;margin-top:28px;opacity:0.85;transition:opacity .3s;}
+  .mode-card:hover .mode-art{opacity:1;}
+
+  .select-footnote{margin-top:48px;font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted);letter-spacing:0.03em;max-width:60ch;line-height:1.6;}
+  .launch-status{margin-top:16px;min-height:16px;font-family:var(--font-mono);font-size:0.72rem;letter-spacing:0.02em;color:var(--text-muted);}
+
+  footer{padding:40px 6vw 32px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;font-family:var(--font-mono);font-size:0.7rem;color:var(--text-muted);letter-spacing:0.04em;}
+
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto;} }
+</style>
+</head>
+<body>
+
+<canvas id="cursor-canvas"></canvas>
+
+<nav>
+  <div class="nav-logo"><span class="dot"></span>Bridge Lite</div>
+  <a class="nav-cta" href="#select">Explore</a>
+</nav>
+
+<section id="hero">
+  <svg id="hero-skeleton" viewBox="0 0 300 300" fill="none">
+    <g id="skeleton-lines" stroke="#29E5C6" stroke-width="2" stroke-linecap="round"></g>
+    <g id="skeleton-dots" fill="#29E5C6"></g>
+  </svg>
+
+  <p class="eyebrow">Python &middot; AI &middot; Computer Vision</p>
+  <h1 class="title">
+    <span class="word-mask"><span class="word-inner">Bridge</span></span><br>
+    <span class="word-mask accent-mask"><span class="word-inner">Lite</span></span>
+  </h1>
+  <p class="hero-sub">Reads a hand sign through a camera and turns it into text and voice — the instant it's shown. Built to close a gap that shouldn't cost anyone time.</p>
+
+  <a href="#about" class="scroll-cue"><span class="line"></span>Scroll to see how</a>
+
+  <div class="bento">
+    <div class="bento-card"><span class="num" data-count="10">0</span><span class="label">Signs recognized</span></div>
+    <div class="bento-card"><span class="num" data-count="21">0</span><span class="label">Hand landmarks tracked</span></div>
+    <div class="bento-card"><span class="num" data-count="30" data-prefix="~">0</span><span class="label">Frames per second</span></div>
+    <div class="bento-card"><span class="num">Help &middot; Hospital &middot; Pain</span><span class="label">Auto-flagged as emergencies</span></div>
+  </div>
+
+  <div class="marquee-wrap">
+    <div class="marquee-track">
+      <span>HELLO</span><span class="dot">&middot;</span><span>BYE</span><span class="dot">&middot;</span><span>YES</span><span class="dot">&middot;</span><span>NO</span><span class="dot">&middot;</span><span>HELP</span><span class="dot">&middot;</span><span>THANK YOU</span><span class="dot">&middot;</span><span>HOSPITAL</span><span class="dot">&middot;</span><span>WATER</span><span class="dot">&middot;</span><span>PAIN</span><span class="dot">&middot;</span><span>STOP</span><span class="dot">&middot;</span>
+      <span>HELLO</span><span class="dot">&middot;</span><span>BYE</span><span class="dot">&middot;</span><span>YES</span><span class="dot">&middot;</span><span>NO</span><span class="dot">&middot;</span><span>HELP</span><span class="dot">&middot;</span><span>THANK YOU</span><span class="dot">&middot;</span><span>HOSPITAL</span><span class="dot">&middot;</span><span>WATER</span><span class="dot">&middot;</span><span>PAIN</span><span class="dot">&middot;</span><span>STOP</span><span class="dot">&middot;</span>
+    </div>
+  </div>
+</section>
+
+<section id="about">
+  <div class="section-head">
+    <p class="eyebrow">How it works</p>
+    <h2>Reading a hand, one point at a time</h2>
+    <p>A camera watches for a hand. A pretrained model locates 21 key points on it — the same landmarks a physiotherapist would mark. A classifier, trained on hand signs recorded specifically for this system, decides what those points mean. If it's an emergency word, it says so immediately.</p>
+  </div>
+
+  <div class="pipeline">
+    <div class="pipe-step"><span class="pipe-line"></span><span class="n">01</span><h3>Camera</h3><p>Live video feed, read frame by frame.</p></div>
+    <div class="pipe-step"><span class="pipe-line"></span><span class="n">02</span><h3>Landmarks</h3><p>21 points located on the hand, position and size normalized.</p></div>
+    <div class="pipe-step"><span class="pipe-line"></span><span class="n">03</span><h3>Classify</h3><p>A trained model matches the shape to a word, with a confidence score.</p></div>
+    <div class="pipe-step"><span class="pipe-line"></span><span class="n">04</span><h3>Respond</h3><p>Text, spoken voice, and an alert if it's urgent.</p></div>
+  </div>
+
+  <div class="about-note">Not everyone communicates through speech. In an emergency, that shouldn't cost anyone time.</div>
+</section>
+
+<section id="select">
+  <div class="section-head">
+    <p class="eyebrow">Two directions</p>
+    <h2>Choose how it speaks</h2>
+  </div>
+
+  <div class="mode-grid">
+    <div class="mode-card" data-magnetic>
+      <p class="dir">Sign &rarr; Text / Voice</p>
+      <h3>Show a sign, hear it back</h3>
+      <p>Hold up a hand sign. Bridge Lite reads it live, displays it, and speaks it aloud — flagging it instantly if it's an emergency word.</p>
+      <svg class="mode-art" viewBox="0 0 300 140" fill="none">
+        <rect x="20" y="15" width="180" height="110" rx="10" stroke="#7C8B92" stroke-width="1.5" opacity="0.5"/>
+        <path d="M20 35 h18 M20 35 v18" stroke="#29E5C6" stroke-width="2"/>
+        <path d="M200 15 h-18 M200 15 v18" stroke="#29E5C6" stroke-width="2"/>
+        <path d="M20 125 h18 M20 125 v-18" stroke="#29E5C6" stroke-width="2"/>
+        <path d="M200 125 h-18 M200 125 v-18" stroke="#29E5C6" stroke-width="2"/>
+        <text x="110" y="75" fill="#F2F5F4" font-family="JetBrains Mono" font-size="13" text-anchor="middle">HELLO</text>
+        <text x="110" y="95" fill="#29E5C6" font-family="JetBrains Mono" font-size="10" text-anchor="middle">92% confidence</text>
+        <g stroke="#29E5C6" stroke-width="4" stroke-linecap="round" opacity="0.9">
+          <line x1="240" y1="70" x2="255" y2="50"/><line x1="255" y1="50" x2="255" y2="30"/>
+          <line x1="240" y1="70" x2="270" y2="50"/><line x1="270" y1="50" x2="272" y2="28"/>
+          <line x1="240" y1="70" x2="240" y2="105"/>
+        </g>
+      </svg>
+      <p class="launch-status"></p>
+    </div>
+
+    <div class="mode-card" data-magnetic>
+      <p class="dir">Text &rarr; Sign</p>
+      <h3>Type a word, see the sign</h3>
+      <p>Type any of the ten known words. Bridge Lite draws the exact hand shape that means it, using the same landmark data it was trained on.</p>
+      <svg class="mode-art" viewBox="0 0 300 140" fill="none">
+        <rect x="20" y="55" width="120" height="30" rx="15" stroke="#7C8B92" stroke-width="1.5" opacity="0.5"/>
+        <text x="35" y="74" fill="#F2F5F4" font-family="JetBrains Mono" font-size="11">help_</text>
+        <path d="M155 70 h30" stroke="#FF6B4A" stroke-width="2"/>
+        <path d="M175 62 l10 8 l-10 8" stroke="#FF6B4A" stroke-width="2" fill="none"/>
+        <g stroke="#29E5C6" stroke-width="3" stroke-linecap="round">
+          <line x1="230" y1="95" x2="230" y2="55"/>
+          <line x1="230" y1="55" x2="220" y2="30"/>
+          <line x1="230" y1="55" x2="240" y2="30"/>
+          <line x1="230" y1="55" x2="250" y2="35"/>
+        </g>
+        <g fill="#29E5C6"><circle cx="230" cy="95" r="4"/><circle cx="230" cy="55" r="4"/>
+          <circle cx="220" cy="30" r="4"/><circle cx="240" cy="30" r="4"/><circle cx="250" cy="35" r="4"/></g>
+      </svg>
+      <p class="launch-status"></p>
+    </div>
+  </div>
+
+  <p class="select-footnote">Click either card to open the real Bridge Lite app on this machine — it runs both directions in one window. Requires <code>launcher_server.py</code> running locally first.</p>
+</section>
+
+<footer>
+  <span>Bridge Lite &middot; Final Year AI Project</span>
+  <span>Built with OpenCV, MediaPipe &amp; a self-trained classifier</span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script>
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const isTouch = window.matchMedia('(pointer: coarse)').matches;
+
+/* ---------- Hero skeleton SVG ---------- */
+const HAND_PTS = [
+  [150,260],[120,235],[100,205],[85,175],[75,150],
+  [130,190],[120,140],[112,100],[106,65],
+  [150,180],[150,120],[150,75],[150,40],
+  [170,185],[178,130],[184,90],[189,58],
+  [190,195],[205,155],[214,122],[221,95]
+];
+const HAND_CONN = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],
+  [0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
+const linesG = document.getElementById('skeleton-lines');
+const dotsG = document.getElementById('skeleton-dots');
+HAND_CONN.forEach(([a,b])=>{
+  const [x1,y1]=HAND_PTS[a], [x2,y2]=HAND_PTS[b];
+  const el=document.createElementNS('http://www.w3.org/2000/svg','line');
+  el.setAttribute('x1',x1);el.setAttribute('y1',y1);el.setAttribute('x2',x2);el.setAttribute('y2',y2);
+  linesG.appendChild(el);
+});
+HAND_PTS.forEach(([x,y])=>{
+  const el=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  el.setAttribute('cx',x);el.setAttribute('cy',y);el.setAttribute('r',4);
+  dotsG.appendChild(el);
+});
+
+/* ---------- Cursor trail ---------- */
+if(!isTouch){
+  const canvas = document.getElementById('cursor-canvas');
+  const ctx = canvas.getContext('2d');
+  function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
+  resize(); window.addEventListener('resize', resize);
+  const trail = [];
+  const MAX_PTS = 9;
+  let mouse = {x: window.innerWidth/2, y: window.innerHeight/2};
+  window.addEventListener('pointermove', e=>{ mouse.x=e.clientX; mouse.y=e.clientY; });
+  function loop(){
+    trail.unshift({x:mouse.x,y:mouse.y});
+    if(trail.length>MAX_PTS) trail.pop();
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    for(let i=0;i<trail.length-1;i++){
+      const a=trail[i], b=trail[i+1];
+      const alpha = 1 - i/MAX_PTS;
+      ctx.strokeStyle = `rgba(41,229,198,${alpha*0.55})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+    }
+    trail.forEach((p,i)=>{
+      const alpha = 1 - i/MAX_PTS;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y, i===0?4:2.4, 0, Math.PI*2);
+      ctx.fillStyle = i===0 ? '#29E5C6' : `rgba(41,229,198,${alpha*0.8})`;
+      ctx.fill();
+      if(i===0){ ctx.shadowColor='#29E5C6'; ctx.shadowBlur=14; ctx.fill(); ctx.shadowBlur=0; }
+    });
+    requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+/* ---------- Text reveal helper ---------- */
+function splitWordsReveal(el){
+  const words = el.textContent.trim().split(' ');
+  el.innerHTML = words.map(w=>`<span class="word-mask"><span class="word-inner">${w}&nbsp;</span></span>`).join('');
+  return el.querySelectorAll('.word-inner');
+}
+document.querySelectorAll('.section-head h2').forEach(h=>splitWordsReveal(h));
+
+/* ---------- Count-up numbers ---------- */
+function countUp(el){
+  const target = parseFloat(el.dataset.count);
+  const prefix = el.dataset.prefix || '';
+  const obj = {val:0};
+  gsap.to(obj, {
+    val: target, duration: 1.6, ease:'power2.out', delay:0.3,
+    onUpdate: ()=>{ el.textContent = prefix + Math.round(obj.val); }
+  });
+}
+
+/* ---------- GSAP ---------- */
+gsap.registerPlugin(ScrollTrigger);
+
+if(!reduceMotion){
+  gsap.to('#hero-skeleton', {scale:1.04, duration:3.2, yoyo:true, repeat:-1, ease:'sine.inOut'});
+  gsap.to('#hero-skeleton', {
+    y:130, opacity:0.04, ease:'none',
+    scrollTrigger:{trigger:'#hero', start:'top top', end:'bottom top', scrub:true}
+  });
+
+  const tl = gsap.timeline({delay:0.15});
+  tl.to('h1.title .word-inner', {y:'0%', duration:0.9, stagger:0.12, ease:'power4.out'})
+    .to('.hero-sub', {opacity:1, duration:0.7, ease:'power2.out'}, '-=0.4')
+    .to('.scroll-cue', {opacity:1, duration:0.6, ease:'power2.out'}, '-=0.3')
+    .to('.bento-card', {opacity:1, y:0, duration:0.7, stagger:0.1, ease:'power3.out',
+        onStart(){ document.querySelectorAll('.num[data-count]').forEach(countUp); }
+       }, '-=0.2');
+
+  ScrollTrigger.batch('.pipe-step', {
+    start:'top 85%',
+    onEnter: batch => gsap.to(batch, {opacity:1, x:0, duration:0.7, stagger:0.15, ease:'power3.out'}),
+    once:true
+  });
+  gsap.utils.toArray('.pipe-line').forEach(line=>{
+    gsap.to(line, {
+      width:'100%', ease:'none',
+      scrollTrigger:{trigger: line.closest('.pipe-step'), start:'top 90%', end:'top 40%', scrub:true}
+    });
+  });
+  gsap.to('.about-note', {
+    opacity:1, y:0, duration:0.8, ease:'power3.out',
+    scrollTrigger:{trigger:'.about-note', start:'top 88%'}
+  });
+  gsap.utils.toArray('.mode-card').forEach((card,i)=>{
+    gsap.from(card, {
+      opacity:0, y:30, duration:0.8, delay:i*0.1, ease:'power3.out',
+      scrollTrigger:{trigger:card, start:'top 88%'}
+    });
+  });
+  document.querySelectorAll('.section-head h2 .word-inner').forEach(el=>{
+    ScrollTrigger.create({
+      trigger: el.closest('.section-head'),
+      start:'top 85%',
+      once:true,
+      onEnter: ()=> gsap.to(el.closest('h2').querySelectorAll('.word-inner'),
+        {y:'0%', duration:0.8, stagger:0.05, ease:'power4.out'})
+    });
+  });
+} else {
+  gsap.set('.word-inner', {y:'0%'});
+  gsap.set('.hero-sub, .scroll-cue, .bento-card, .pipe-step, .about-note', {opacity:1, x:0, y:0});
+  gsap.set('.pipe-line', {width:'100%'});
+  document.querySelectorAll('.num[data-count]').forEach(el=>{
+    el.textContent = (el.dataset.prefix||'') + el.dataset.count;
+  });
+}
+
+/* ---------- Magnetic mode cards ---------- */
+if(!isTouch){
+  document.querySelectorAll('[data-magnetic]').forEach(card=>{
+    const xTo = gsap.quickTo(card, 'x', {duration:0.5, ease:'power3.out'});
+    const yTo = gsap.quickTo(card, 'y', {duration:0.5, ease:'power3.out'});
+    card.addEventListener('mousemove', e=>{
+      const r = card.getBoundingClientRect();
+      const relX = e.clientX - (r.left + r.width/2);
+      const relY = e.clientY - (r.top + r.height/2);
+      xTo(relX * 0.06);
+      yTo(relY * 0.10);
+    });
+    card.addEventListener('mouseleave', ()=>{ xTo(0); yTo(0); });
+  });
+}
+
+/* ---------- Launch the real desktop app via local launcher ---------- */
+const LAUNCHER_URL = 'http://localhost:5005/launch';
+document.querySelectorAll('.mode-card').forEach(card=>{
+  const statusEl = card.querySelector('.launch-status');
+  card.addEventListener('click', async ()=>{
+    if(!statusEl) return;
+    statusEl.textContent = 'Launching Bridge Lite…';
+    statusEl.style.color = 'var(--signal)';
+    try{
+      const res = await fetch(LAUNCHER_URL);
+      if(!res.ok) throw new Error('bad response');
+      statusEl.textContent = 'Opened — check your taskbar for the Bridge Lite window.';
+    }catch(err){
+      statusEl.textContent = 'Launcher not running. In your project folder: python launcher_server.py';
+      statusEl.style.color = 'var(--warm)';
+    }
+  });
+});
+</script>
+</body>
+</html>
