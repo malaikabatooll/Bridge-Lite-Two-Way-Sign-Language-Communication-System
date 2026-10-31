@@ -1,0 +1,9 @@
+opencv-python
+numpy
+mediapipe
+joblib
+pandas
+scikit-learn
+customtkinter
+Pillow
+pyttsx3
