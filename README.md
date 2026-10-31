@@ -105,7 +105,7 @@ pip install -r requirements.txt
 ### Run the Application
 
 ```bash
-python main.py
+python code/main.py
 ```
 
 **Note:** Ensure that the trained model, MediaPipe hand-landmarker task file, sign images, and other required project assets are present in their expected locations. The emergency sound feature currently uses Windows' built-in `winsound` module.
