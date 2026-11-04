@@ -1,27 +1,19 @@
-
 # emergency.py
 
-# Words that should trigger an emergency alert.
+# Keep in sync with the website's Emergency-flagged signs.
 EMERGENCY_WORDS = {
     "help",
     "hospital",
-    "pain",
-    "sick"
+    "pain"
+    "sick",
 }
 
 
 def is_emergency(word):
     """
-    Check whether a recognized word is an emergency word.
-
-    Returns:
-        bool: True if the word is an emergency word,
-              otherwise False.
+    Return True if the recognized word is an emergency word.
     """
-
     if not word:
         return False
 
-    normalized_word = str(word).lower().strip()
-
-    return normalized_word in EMERGENCY_WORDS
+    return str(word).lower().strip() in EMERGENCY_WORDS
