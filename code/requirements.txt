@@ -5,3 +5,4 @@ numpy
 mediapipe
 joblib
 scikit-learn
+python-multipart
